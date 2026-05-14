@@ -34,9 +34,6 @@ const float VERSION_ACTUAL = 6.1;
 //const float I_MAX = 20.0;        // Corriente máxima sensor (15 metros)
 //const float V_MAX = 10.0;// tensión máxima del regulador 4-20 a 0-10V (jumper 2 quitado. Con los dos jumper puestos, sería 0-3.3V)
 const int ledPin = 14; // en el ESP32, era el 2
-//const char* DEFAULT_SSID = "ctlnsrz16vdfn";
-//const char* DEFAULT_PASS = "ctlnsrz16vdfne";
-//char scriptURL[150] = "https://script.google.com/macros/s/AKfycbybdpPHvBwuFokiMDu765gOQx3REcbAIuOuv6_IyFGhVeGuOyxrXeCctPgZBUXIfOduEA/exec";
 char scriptURL[150] = "";
 bool shouldSaveConfig = false;
 bool adsOK = false;
@@ -85,9 +82,7 @@ void loop() {
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
     ejecutarCicloLectura();
- 
-
-if (haCambiadoElDato()) {
+ if (haCambiadoElDato()) {
       gestionarEnvioDatos();
       // Guardamos el estado actual como último enviado
       last_voltaje = voltaje;
