@@ -29,7 +29,7 @@ WiFiMulti wifiMulti;
 #define SCL_PIN 9 // para el ESP32 S2 mini
 DHT dht(DHTPIN, DHTTYPE);
 
-const float VERSION_ACTUAL = 6.4;
+const float VERSION_ACTUAL = 6.45;
 
 //const float NIVEL_MAX = 15.0;    // Nivel máximo del sensor en metros
 //const float I_MIN = 4.0;         // Corriente mínima sensor (0 metros)
@@ -43,6 +43,7 @@ bool adsOK = false;
 float voltaje, nivel, temp, hum;
 unsigned long previousMillis = 0;
 const unsigned long interval = 119364; // aprox 120000  =2 minutos ajustado experimentalmente
+// const unsigned long UPDATE_INTERVAL = 43200000;
 
 // Variables para control de cambios
 float last_voltaje = -99.0;
@@ -78,7 +79,7 @@ void setup() {
 //                LOOP
 // ==========================================
 void loop() {
-  if (primerLoop = true) {Serial.println("\n>>> Inicio del loop (versión 6.3)"); primerLoop = false;}
+  if (primerLoop) {Serial.println("\n>>> Inicio del loop (versión 6.45)"); primerLoop = false;}
   ArduinoOTA.handle();      // Mantiene activa la actualización inalámbrica
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= interval) {
