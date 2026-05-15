@@ -1,8 +1,9 @@
 /*
-Cambios en la versión 6.0 VERSIÓM PARA ESP32 S2 mini
+Cambios en la versión 6.4 VERSIÓM PARA ESP32 S2 mini
  se incluye:
 analiza si cada dato es distinto del anterior, y sólo envía el dato si el cambio es significativo.	
 descarga desde GitHub
+Cambio el pin led al 15, porque el 14 no funciona
 */
 
 
@@ -27,13 +28,13 @@ WiFiMulti wifiMulti;
 #define SCL_PIN 9 // para el ESP32 S2 mini
 DHT dht(DHTPIN, DHTTYPE);
 
-const float VERSION_ACTUAL = 6.1;
+const float VERSION_ACTUAL = 6.4;
 
 //const float NIVEL_MAX = 15.0;    // Nivel máximo del sensor en metros
 //const float I_MIN = 4.0;         // Corriente mínima sensor (0 metros)
 //const float I_MAX = 20.0;        // Corriente máxima sensor (15 metros)
 //const float V_MAX = 10.0;// tensión máxima del regulador 4-20 a 0-10V (jumper 2 quitado. Con los dos jumper puestos, sería 0-3.3V)
-const int ledPin = 14; // en el ESP32, era el 2
+const int ledPin = 15; // en el ESP32, era el 2
 char scriptURL[150] = "";
 bool shouldSaveConfig = false;
 bool adsOK = false;
@@ -50,7 +51,6 @@ float last_hum = -99.0;
 const float UMBRAL_VOLTAJE = 0.02; // Cambio mínimo de 20mV
 const float UMBRAL_TEMP = 0.5;    // Cambio mínimo de 0.5 grados
 const float UMBRAL_HUM = 1.0;     // Cambio mínimo de 1% 
-
 
 const char* URL_VERSION = "https://raw.githubusercontent.com/luisfdezrm-stack/arduino/main/version_actual";
 const char* URL_BINARIO = "https://raw.githubusercontent.com/luisfdezrm-stack/arduino/main/googlesheetV6-ESP32S2mini.ino.bin";
@@ -72,25 +72,23 @@ void setup() {
  }
 
 
-
 // ==========================================
 //                LOOP
 // ==========================================
 void loop() {
+  Serial.println("\n>>> Inicio del loop (versión 6.3)");
   ArduinoOTA.handle();      // Mantiene activa la actualización inalámbrica
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
     ejecutarCicloLectura();
- if (haCambiadoElDato()) {
+if (haCambiadoElDato()) {
       gestionarEnvioDatos();
       // Guardamos el estado actual como último enviado
       last_voltaje = voltaje;
       last_temp = temp;
       last_hum = hum;
-    } else {
-      Serial.println(">>> Datos estables. No se requiere envío.");
-    }
+    } else {Serial.println(">>> Datos estables. No se requiere envío."); }
     checkParaActualizar();
   }
 }
@@ -99,7 +97,6 @@ void loop() {
 // ==========================================
 //               FUNCIONES
 // ==========================================
-
 bool haCambiadoElDato() {
   bool cambioV = abs(voltaje - last_voltaje) >= UMBRAL_VOLTAJE;
   bool cambioT = abs(temp - last_temp) >= UMBRAL_TEMP;
@@ -118,15 +115,12 @@ void checkParaActualizar() {
   Serial.println("Comprobando actualizaciones en GitHub...");
   http.begin(client, URL_VERSION); 
   int httpCode = http.GET();
-
   if (httpCode == HTTP_CODE_OK) {
     String payload = http.getString();
     float version_remota = payload.toFloat();
-
     // 2. Comparar: ¿Es la versión de la web mayor que la mía?
     if (version_remota > VERSION_ACTUAL) {
       Serial.printf("Nueva versión detectada: %.1f. Actualizando...\n", version_remota);
-
      // Configuramos el timeout para descargas pesadas
       httpUpdate.setLedPin(ledPin, LOW); // Opcional: parpadea el LED durante la descarga
         // 3. Ejecutar la descarga del binario solo si la versión es superior
@@ -136,18 +130,11 @@ void checkParaActualizar() {
     case HTTP_UPDATE_NO_UPDATES: Serial.println("No hay actualizaciones."); break;
     case HTTP_UPDATE_OK: Serial.println("Actualización terminada! Nueva versión zzzzzzzzzzzzzzzzzzzzzzzz descargado desde github zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"); break;
   }
-      
-      // (Manejo de errores del update...)
-    } else {
-      Serial.println("El firmware está al día.");
-    }
+    } else {Serial.println("El firmware está al día."); }
   }
-  else {
-    Serial.printf("Error al conectar con GitHub para verificar versión. Código HTTP: %d\n", httpCode);
-  }
+  else { Serial.printf("Error al conectar con GitHub para verificar versión. Código HTTP: %d\n", httpCode);  }
   http.end();  
 }
-
 
 void configurarSistemaArchivos() {
   if (!LittleFS.begin(false)) {    // Intentar montar sin formatear
@@ -168,14 +155,9 @@ void configurarSistemaArchivos() {
       Serial.println("URL cargada desde LittleFS:");
       Serial.println(scriptURL);
       f.close();
-    } else {
-      Serial.println("Error abriendo /config_url.txt");
-    }
-  } else {
-    Serial.println("No existe /config_url.txt, usando URL por defecto.");
-  }
+    } else {Serial.println("Error abriendo /config_url.txt"); }
+  } else {Serial.println("No existe /config_url.txt, usando URL por defecto."); }
 }
-
 
 void gestionarConexionWifi() {
   WiFiManager wm;
@@ -187,20 +169,15 @@ void gestionarConexionWifi() {
   // Intentar conectar (Si falla crea AP "ESP32_Sensor_Config")
   if (!wm.autoConnect("ESP32_Sensor_Config")) {
     Serial.println("No hay credenciales guardadas o fallo. Abrimos portal como Punto de acceso, AP: ESP32_Sensor_Config......");
-   // WiFi.begin(DEFAULT_SSID, DEFAULT_PASS);
-     int retries = 0;
+    int retries = 0;
     while (WiFi.status() != WL_CONNECTED && retries < 20) {
       delay(500);
       Serial.print(".");
       retries++;
     }
- if (WiFi.status() != WL_CONNECTED) {
-      Serial.println("\nFallback fallido. Abriendo portal...");
-      wm.startConfigPortal("ESP32_Sensor_Config");
-    }
+ if (WiFi.status() != WL_CONNECTED) { Serial.println("\nFallback fallido. Abriendo portal..."); wm.startConfigPortal("ESP32_Sensor_Config"); }
   }
   if (shouldSaveConfig) {    // Guardar la URL si se cambió en el portal
- //   strcpy(scriptURL, custom_script_url.getValue()); Sustituyo esta propuesta por Gemini, por la siguiente de ChatGPT
 strncpy(scriptURL, custom_script_url.getValue(), sizeof(scriptURL) - 1);
 scriptURL[sizeof(scriptURL) - 1] = '\0';
     File f = LittleFS.open("/config_url.txt", "w");
@@ -213,7 +190,6 @@ scriptURL[sizeof(scriptURL) - 1] = '\0';
   }
  Serial.print("IP: "); Serial.println(WiFi.localIP());
 }
-
 
 void configurarWiFiDesdeFS() {
   if (LittleFS.exists("/wifi_creds.txt")) {
@@ -231,11 +207,8 @@ void configurarWiFiDesdeFS() {
     }
     f.close();
   }
-
   Serial.println("Conectando WiFi...");
-  if (wifiMulti.run() == WL_CONNECTED) {
-    Serial.print("Conectado a: "); Serial.println(WiFi.SSID());
-  }
+  if (wifiMulti.run() == WL_CONNECTED) {Serial.print("Conectado a: "); Serial.println(WiFi.SSID()); }
 }
 
 void configurarOTA() { ArduinoOTA.setHostname("esp32-sensor-nivel"); ArduinoOTA.begin();}
@@ -244,17 +217,14 @@ void inicializarHardware() {
   Wire.begin(SDA_PIN, SCL_PIN); // especifico para S2 mini
   pinMode(ledPin, OUTPUT);
   dht.begin();
-  Serial.println("Iniciando ADS1115...");
+  Serial.println("Iniciando ADS1115 en pines 8(SDA) y 9(SCL)...");
   adsOK = ads.begin();
-  if (!adsOK) {
-  Serial.println("ADS1115 no detectado. Continuando sin él.");
-  }
+  if (!adsOK) { Serial.println("ADS1115 no detectado. Continuando sin él."); }
 // Ajuste de ganancia para señales de hasta 4.096V (para medir hasta 6.144V, se usaría GAIN_TWOTHIRDS
   ads.setGain(GAIN_ONE); 
   ads.setDataRate(RATE_ADS1115_8SPS);   // AJUSTE A 8 lecturas por segundo, el ADC es más lento pero menos ruido
   Serial.println("ADS1115 configurado a 8 SPS.");
 }
-
 
 void ejecutarCicloLectura() { blinkLED(); leerADS1115(); leerDHT11(); }
 
