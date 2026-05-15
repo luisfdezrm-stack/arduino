@@ -1,10 +1,11 @@
 /*
-Cambios en la versión 6.4 VERSIÓN PARA ESP32 S2 mini
+Cambios en la versión 6.47 VERSIÓN PARA ESP32 S2 mini
  se incluye:
 analiza si cada dato es distinto del anterior, y sólo envía el dato si el cambio es significativo.	
 descarga desde GitHub
 Cambio el pin led al 15, porque el 14 no funciona
 Ya no promedio 50 lecturas, sino 10
+Corrección lectura ADS
 */
 
 
@@ -20,7 +21,7 @@ Ya no promedio 50 lecturas, sino 10
 #include <ArduinoOTA.h>
 #include <LittleFS.h>  //para almacenar vbles en ESP32 memoria no volátil
 
-Adafruit_ADS1115 ads; // Creamos la instancia del objeto ADS1115
+Adafruit_ADS1115 ads;
 WiFiMulti wifiMulti;
 
 #define DHTPIN 5 // en el ESP32 es 4
@@ -29,7 +30,7 @@ WiFiMulti wifiMulti;
 #define SCL_PIN 9 // para el ESP32 S2 mini
 DHT dht(DHTPIN, DHTTYPE);
 
-const float VERSION_ACTUAL = 6.45;
+const float VERSION_ACTUAL = 6.47;
 
 //const float NIVEL_MAX = 15.0;    // Nivel máximo del sensor en metros
 //const float I_MIN = 4.0;         // Corriente mínima sensor (0 metros)
@@ -42,8 +43,8 @@ bool primerLoop = true;
 bool adsOK = false;
 float voltaje, nivel, temp, hum;
 unsigned long previousMillis = 0;
-const unsigned long interval = 119364; // aprox 120000  =2 minutos ajustado experimentalmente
-// const unsigned long UPDATE_INTERVAL = 43200000;
+const unsigned long interval = 120000; // aprox 2 minutos
+const unsigned long UPDATE_INTERVAL = 3600000;// aprox 1 hora
 
 // Variables para control de cambios
 float last_voltaje = -99.0;
@@ -72,6 +73,7 @@ void setup() {
 //  LittleFS.remove("/config_url.txt"); //limpia la URL que está guardada en la memoria
   checkParaActualizar();
   Serial.println("\n>>> Sistema Inicializado Correctamente (SETUP)");
+  Serial.printf("\n>>> fin del setup, iniciando programa con versión %.2f\n", VERSION_ACTUAL);
  }
 
 
@@ -79,21 +81,22 @@ void setup() {
 //                LOOP
 // ==========================================
 void loop() {
-  if (primerLoop) {Serial.println("\n>>> Inicio del loop (versión 6.45)"); primerLoop = false;}
-  ArduinoOTA.handle();      // Mantiene activa la actualización inalámbrica
+  if (primerLoop) { Serial.printf("\n>>> Inicio del loop (versión %.2f)\n", VERSION_ACTUAL); primerLoop = false;}
+ //  ejecutarCicloLectura();
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
     ejecutarCicloLectura();
-if (haCambiadoElDato()) {
+    if (haCambiadoElDato()) {
       gestionarEnvioDatos();
       // Guardamos el estado actual como último enviado
       last_voltaje = voltaje;
       last_temp = temp;
       last_hum = hum;
     } else {Serial.println(">>> Datos estables. No se requiere envío."); }
-    checkParaActualizar();
+        checkParaActualizar();
   }
+  ArduinoOTA.handle();      // Mantiene activa la actualización inalámbrica
 }
 
 
@@ -116,6 +119,7 @@ void checkParaActualizar() {
   client.setInsecure();
   http.setUserAgent("ESP32-S2-Mini");
   Serial.println("Comprobando actualizaciones en GitHub...");
+  Serial.printf("\n>>> Versión actual> %.2f \n", VERSION_ACTUAL);
   http.begin(client, URL_VERSION); 
   int httpCode = http.GET();
   if (httpCode == HTTP_CODE_OK) {
@@ -130,7 +134,6 @@ void checkParaActualizar() {
       t_httpUpdate_return ret = httpUpdate.update(client, URL_BINARIO);
     switch (ret) {
     case HTTP_UPDATE_FAILED: Serial.printf("Error: %s\n", httpUpdate.getLastErrorString().c_str()); break;
-    case HTTP_UPDATE_NO_UPDATES: Serial.println("No hay actualizaciones."); break;
     case HTTP_UPDATE_OK: Serial.println("Actualización terminada! Nueva versión zzzzzzzzzzzzzzzzzzzzzzzz descargado desde github zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"); break;
   }
     } else {Serial.println("El firmware está al día."); }
@@ -140,16 +143,10 @@ void checkParaActualizar() {
 }
 
 void configurarSistemaArchivos() {
-  if (!LittleFS.begin(false)) {    // Intentar montar sin formatear
-    Serial.println("Error montando LittleFS. Intentando formatear...");
-    if (!LittleFS.begin(true)) {     // Intentar formatear solo si falla
-      Serial.println("Error crítico: no se pudo montar ni formatear LittleFS.");
-      return;
-    }
-    Serial.println("LittleFS formateado correctamente.");
-  }
-  if (LittleFS.exists("/config_url.txt")) {    // Leer archivo si existe
-    File f = LittleFS.open("/config_url.txt", "r");
+  if (!LittleFS.begin(false)) { Serial.println("Error montando LittleFS. Intentando formatear...");
+    if (!LittleFS.begin(true)) {Serial.println("Error crítico: no se pudo montar ni formatear LittleFS."); return; }
+    Serial.println("LittleFS formateado correctamente.");  }
+  if (LittleFS.exists("/config_url.txt")) {  File f = LittleFS.open("/config_url.txt", "r");
     if (f) {
       String storedURL = f.readString();
       storedURL.trim();  // elimina saltos de línea y espacios
@@ -170,14 +167,9 @@ void gestionarConexionWifi() {
   wm.addParameter(&custom_script_url);
   wm.setConfigPortalTimeout(180); // 3 minutos intentando portal (opcional)
   // Intentar conectar (Si falla crea AP "ESP32_Sensor_Config")
-  if (!wm.autoConnect("ESP32_Sensor_Config")) {
-    Serial.println("No hay credenciales guardadas o fallo. Abrimos portal como Punto de acceso, AP: ESP32_Sensor_Config......");
+  if (!wm.autoConnect("ESP32_Sensor_Config")) {Serial.println("No hay credenciales guardadas o fallo. Abrimos portal como Punto de acceso, AP: ESP32_Sensor_Config......");
     int retries = 0;
-    while (WiFi.status() != WL_CONNECTED && retries < 20) {
-      delay(500);
-      Serial.print(".");
-      retries++;
-    }
+    while (WiFi.status() != WL_CONNECTED && retries < 20) {delay(500);Serial.print(".");retries++; }
  if (WiFi.status() != WL_CONNECTED) { Serial.println("\nFallback fallido. Abriendo portal..."); wm.startConfigPortal("ESP32_Sensor_Config"); }
   }
   if (shouldSaveConfig) {    // Guardar la URL si se cambió en el portal
@@ -238,7 +230,7 @@ void leerADS1115() {
  suma += ads.readADC_SingleEnded(0);
  delay(10); }
  int sensorValue = suma / 10;
- float voltaje0 = sensorValue * 0.1875 / 1000.0;
+ float voltaje0 = sensorValue * 0.1875 / 1000.0; // TODO 
  voltaje = voltaje0;
 // El factor depende de la ganancia elegida (para TWOTHIRDS es 0.1875mV por bit)
 // Factor ajustado manualmente tras calibración real (no coincide con GAIN_ONE teórico)
