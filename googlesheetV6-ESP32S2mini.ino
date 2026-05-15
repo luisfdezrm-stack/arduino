@@ -5,8 +5,6 @@ analiza si cada dato es distinto del anterior, y sólo envía el dato si el camb
 descarga desde GitHub
 Cambio el pin led al 15, porque el 14 no funciona
 */
-
-
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
