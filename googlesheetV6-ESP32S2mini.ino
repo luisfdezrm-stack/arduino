@@ -1,10 +1,13 @@
 /*
-Cambios en la versión 6.4 VERSIÓM PARA ESP32 S2 mini
+Cambios en la versión 6.4 VERSIÓN PARA ESP32 S2 mini
  se incluye:
 analiza si cada dato es distinto del anterior, y sólo envía el dato si el cambio es significativo.	
 descarga desde GitHub
 Cambio el pin led al 15, porque el 14 no funciona
+Ya no promedio 50 lecturas, sino 10
 */
+
+
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
@@ -35,10 +38,11 @@ const float VERSION_ACTUAL = 6.4;
 const int ledPin = 15; // en el ESP32, era el 2
 char scriptURL[150] = "";
 bool shouldSaveConfig = false;
+bool primerLoop = true;
 bool adsOK = false;
 float voltaje, nivel, temp, hum;
 unsigned long previousMillis = 0;
-const unsigned long interval = 111364; // aprox 120000  =2 minutos ajustado experimentalmente
+const unsigned long interval = 119364; // aprox 120000  =2 minutos ajustado experimentalmente
 
 // Variables para control de cambios
 float last_voltaje = -99.0;
@@ -74,7 +78,7 @@ void setup() {
 //                LOOP
 // ==========================================
 void loop() {
-  Serial.println("\n>>> Inicio del loop (versión 6.3)");
+  if (primerLoop = true) {Serial.println("\n>>> Inicio del loop (versión 6.3)"); primerLoop = false;}
   ArduinoOTA.handle();      // Mantiene activa la actualización inalámbrica
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= interval) {
@@ -229,10 +233,10 @@ void ejecutarCicloLectura() { blinkLED(); leerADS1115(); leerDHT11(); }
 void leerADS1115() {
  if (!adsOK) return;
  long suma = 0;
- for(int i = 0; i < 50; i++) {
+ for(int i = 0; i < 10; i++) {
  suma += ads.readADC_SingleEnded(0);
- delay(100); }
- int sensorValue = suma / 50;
+ delay(10); }
+ int sensorValue = suma / 10;
  float voltaje0 = sensorValue * 0.1875 / 1000.0;
  voltaje = voltaje0;
 // El factor depende de la ganancia elegida (para TWOTHIRDS es 0.1875mV por bit)
